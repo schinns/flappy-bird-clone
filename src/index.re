@@ -26,7 +26,8 @@ type stateT = {
   birdVY: float,
   pipes: list((float, float)),
   xOffset: float,
-  running: runningT
+  running: runningT,
+  image: imageT
 };
 
 let setup = (env) => {
@@ -37,7 +38,8 @@ let setup = (env) => {
    birdVY: 0.,
    pipes: [(200., 100.), (400., 100.), (600., 100.), (800., 100.)],
    xOffset: 0.,
-   running: Running
+   running: Running,
+   image: Draw.loadImage(~filename="assets/flappy.png", ~isPixel=true, env)
   }
 };
 
@@ -48,9 +50,9 @@ let generatePipe = (x) => {
   )
 };
 
-let generateNewPipes = ({pipes, xOffset}, env) =>
+let generateNewPipes = ({pipes, xOffset}) =>
   List.map(
-    ((x, y) as pipe) =>
+    ((x, _y) as pipe) =>
       if (x -. xOffset +. pipeWidth <= 0.) {
         let newX = List.fold_left((maxX, (x, _)) => max(maxX, x), 0., pipes);
         generatePipe(newX);
@@ -62,10 +64,23 @@ let generateNewPipes = ({pipes, xOffset}, env) =>
 
 let drawBird = (state, env) => {
   Draw.fill(Utils.color(~r=41, ~g=166, ~b=244, ~a=255), env);
-  Draw.ellipsef(~center=(state.birdX, state.birdY), ~radx=birdSize, ~rady=birdSize, env);
-}
+  /*Draw.ellipsef(~center=(state.birdX, state.birdY), ~radx=birdSize, ~rady=birdSize, env);*/
+  Draw.subImage(
+    state.image,
+    ~pos=(
+      int_of_float(state.birdX -. birdSize),
+      int_of_float(state.birdY -. birdSize)
+    ),
+    ~width=int_of_float(birdSize *. 2.), 
+    ~height=int_of_float(birdSize *. 2.),
+    ~texPos=(115, 377),
+    ~texWidth=17, 
+    ~texHeight=17,
+    env
+    )
+};
 
-let draw = ({birdX, birdY, birdVY, pipes, xOffset, running} as state, env) => {
+let draw = ({birdX, birdY, birdVY, pipes, xOffset, running, image} as state, env) => {
   Draw.background(Utils.color(~r=199, ~g=217, ~b=229, ~a=255), env);
   Draw.fill(Utils.color(~r=41, ~g=244, ~b=150, ~a=255), env);
   Draw.rectf(
@@ -87,7 +102,7 @@ let draw = ({birdX, birdY, birdVY, pipes, xOffset, running} as state, env) => {
      ~height=float_of_int(Env.height(env)),
      env
     );
-  }, pipes);
+  }, pipes); 
   drawBird(state, env);
   let collided = List.exists(((x,y)) => {
     Utils.intersectRectCircle(
@@ -106,7 +121,7 @@ let draw = ({birdX, birdY, birdVY, pipes, xOffset, running} as state, env) => {
       ~circleRad=birdSize
     )
   }, pipes) 
-  let pipes = generateNewPipes(state, env);
+  let pipes = generateNewPipes(state);
   let hitFloor = birdY >= floorY -. birdSize;
   let deltaTime = Env.deltaTime(env);
   switch (running) {
@@ -116,7 +131,7 @@ let draw = ({birdX, birdY, birdVY, pipes, xOffset, running} as state, env) => {
       birdY: max(min(birdY +. birdVY *. deltaTime, floorY -. birdSize), birdSize),
       birdVY: Env.keyPressed(Space, env) ? -200. : birdVY +. gravity *. deltaTime,
       xOffset: xOffset +. speed *. deltaTime,
-      running: collided ? Dead : Running
+      running: collided || hitFloor ? Dead : Running
     }
   | Dead => {
       ...state,
